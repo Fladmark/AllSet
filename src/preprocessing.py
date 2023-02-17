@@ -408,6 +408,15 @@ def ExtractV2E(data):
     data.edge_index = edge_index[:, :cidx].type(torch.LongTensor)
     return data
 
+    # num_nodes = data.n_x
+    # num_hyperedges = data.num_hyperedges
+    # if not ((data.n_x+data.num_hyperedges-1) == data.edge_index[0].max().item()):
+    #     print('num_hyperedges does not match! 1')
+    #     return
+    # cidx = torch.where(edge_index[0] == num_nodes)[0].min()  # cidx: [V...|cidx E...]
+    # data.edge_index = edge_index[:, :cidx].type(torch.LongTensor)
+    # return data
+
 
 def Add_Self_Loops(data):
     # update so we dont jump on some indices

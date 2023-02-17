@@ -41,7 +41,7 @@ class HyperGraphConvolution(Module):
             A = Laplacian(n, structure, X, m)
         else: A = structure
 
-        A = A.to(self.device)
+        #A = A.to(self.device)
         A = Variable(A)
 
         AHW = SparseMM.apply(A, HW)     
