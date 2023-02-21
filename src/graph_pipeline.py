@@ -16,7 +16,7 @@ import scipy.sparse as sp
 
 p2raw = '../data/AllSet_all_raw_data/cocitation/'
 p2raw = '../data/AllSet_all_raw_data/'
-dname = "cora"
+dname = "Mushroom"
 
 dataset = dataset_Hypergraph(name=dname, root='../data/pyg_data/hypergraph_dataset_updated/',
                              p2raw=p2raw)
@@ -25,8 +25,9 @@ dataset = dataset_Hypergraph(name=dname, root='../data/pyg_data/hypergraph_datas
 #                              feature_noise=0,
 #                              p2raw=p2raw)
 
-pairs = dataset.data.edge_index.numpy().T
-
+print(dataset.data)
+print(len(np.unique(dataset.data.y)))
+# Hacky way of halfing the size of edge index (because dataset_Hypergraph for some reason duplicated this)
 single_edge_index = [[],[]]
 edge_index_overview = set()
 
@@ -42,15 +43,21 @@ for i in range(dataset.data.edge_index.shape[1]):
 
 dataset.data.edge_index = torch.tensor(single_edge_index)
 
-ei = (dataset.data.edge_index.numpy().T)
+print(dataset.data)
 
-adj, Pv, PvT, Pe, PeT = line_expansion(ei)
-#adj = torch.tensor(adj.todense())
-adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
-adj = normalize(adj + 2.0 * sp.eye(adj.shape[0]))
-adj = sparse_mx_to_torch_sparse_tensor(adj)
+pairs = (dataset.data.edge_index.numpy().T)
 
+print(pairs)
+
+adj, Pv, PvT, Pe, PeT = line_expansion(pairs, dataset.data.y)
+
+print(Pv.shape)
+print(dataset.data.x.shape)
+
+# project features to LE
 dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
+
+# sparse back projection matrix
 PvT = sparse_mx_to_torch_sparse_tensor(PvT)
 
 
@@ -60,7 +67,14 @@ valid_prop = 0.25
 lr = 0.001
 wd = 0
 epochs = 50
-classes = 2
+if dname == "cora":
+    classes = 7
+elif dname == "Mushroom":
+    classes = 2
+elif dname == "zoo":
+    classes = 7
+elif dname == "citeseer":
+    classes = 7
 display_step = -1
 feature_noise = 0
 heads = 0

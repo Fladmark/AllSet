@@ -6,8 +6,10 @@ import numpy as np
 import scipy.sparse as sp
 from itertools import combinations
 
+from src.graph_utlis import normalize, sparse_mx_to_torch_sparse_tensor
 
-def line_expansion(pairs, v_threshold=30, e_threshold=30):
+
+def line_expansion(pairs, y,v_threshold=30, e_threshold=30):
     """construct line expansion from original hypergraph
     INPUT:
         - pairs <matrix>
@@ -27,7 +29,8 @@ def line_expansion(pairs, v_threshold=30, e_threshold=30):
     """
     # get # of vertices and encode them starting from 0
     uniq_vertex = np.unique(pairs[:, 0])
-    N_vertex = len(uniq_vertex)
+    #N_vertex = len(uniq_vertex)
+    N_vertex = len(y)
     pairs[:, 0] = list(map({vertex: i for i, vertex in enumerate(uniq_vertex)}.get, pairs[:, 0]))
 
     # get # of hyperedges and encode them starting from 0
@@ -36,6 +39,7 @@ def line_expansion(pairs, v_threshold=30, e_threshold=30):
     pairs[:, 1] = list(map({hyperedge: i for i, hyperedge in enumerate(uniq_hyperedge)}.get, pairs[:, 1]))
 
     N_node = pairs.shape[0]
+    #print(N_vertex)
 
     # vertex projection: from vertex to node
     Pv = sp.coo_matrix((np.ones(N_node), (np.arange(N_node), pairs[:, 0])),
@@ -45,7 +49,11 @@ def line_expansion(pairs, v_threshold=30, e_threshold=30):
     weight = np.ones(N_node)
     for vertex in range(N_vertex):
         tmp = np.where(pairs[:, 0] == vertex)[0]
-        weight[tmp] = 1. / len(tmp)
+        # if not in an hyperedge, weight = 1. Necessary since we no longer count unique vertices
+        if len(tmp) == 0:
+            weight[tmp] = 1
+        else:
+            weight[tmp] = 1. / len(tmp)
     PvT = sp.coo_matrix((weight, (pairs[:, 0], np.arange(N_node))),
                         shape=(N_vertex, N_node), dtype=np.float32)  # (N_vertex, N_node)
 
@@ -85,5 +93,10 @@ def line_expansion(pairs, v_threshold=30, e_threshold=30):
     edges = np.array(edges)
     adj = sp.coo_matrix((np.ones(edges.shape[0]), (edges[:, 0], edges[:, 1])),
                         shape=(N_node, N_node), dtype=np.float32)
+
+    # Makes adj symmetric
+    adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
+    adj = normalize(adj + 2.0 * sp.eye(adj.shape[0]))
+    adj = sparse_mx_to_torch_sparse_tensor(adj)
 
     return adj, Pv, PvT, Pe, PeT

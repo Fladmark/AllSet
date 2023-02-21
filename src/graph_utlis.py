@@ -3,6 +3,7 @@ import scipy.sparse as sp
 import torch
 import torch.nn.functional as F
 
+# from LEGCN
 def normalize(mx):
     """Row-normalize sparse matrix"""
     rowsum = np.array(mx.sum(1))
@@ -12,7 +13,7 @@ def normalize(mx):
     mx = (r_mat_inv).dot(mx)
     return mx
 
-
+# from LEGCN
 def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     """Convert a scipy sparse matrix to a torch sparse tensor."""
     sparse_mx = sparse_mx.tocoo().astype(np.float32)
@@ -22,6 +23,7 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     shape = torch.Size(sparse_mx.shape)
     return torch.sparse.FloatTensor(indices, values, shape)
 
+# from train.py - Tweaks: added adj and PvT for GCN usability
 @torch.no_grad()
 def evaluate_GCN(model, data, split_idx, eval_func, adj, PvT, result=None):
     if result is not None:
