@@ -233,7 +233,7 @@ def main(args):
     dname_list = ['cora', 'citeseer', 'pubmed',
                   'coauthor_cora', 'coauthor_dblp',
                   'NTU2012', 'ModelNet40', 
-                  'zoo', 'Mushroom', '20newsW100', 
+                  'zoo', 'Mushroom', '20newsW100',
                   'yelp', 'house-committees-100', 'walmart-trips-100']
 
     if args['dataset'] == 'ACMRaw':

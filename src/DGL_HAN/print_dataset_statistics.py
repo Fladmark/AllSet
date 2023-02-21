@@ -26,7 +26,7 @@ from scipy import sparse
 dname_list = ['cora', 'citeseer', 'pubmed',
               'coauthor_cora', 'coauthor_dblp',
               'NTU2012', 'ModelNet40', 
-              'zoo', 'Mushroom', '20newsW100', 
+              'zoo', 'Mushroom', '20newsW100',
               'house-committees-100', 'walmart-trips-100', 'yelp']
 
 # dname_list = ['house-committees-100', 'walmart-trips-100', 'yelp']

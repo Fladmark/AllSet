@@ -22,7 +22,7 @@ from torch_scatter import scatter_add, scatter
 dname_list = ['cora', 'citeseer', 'pubmed',
               'coauthor_cora', 'coauthor_dblp',
               'NTU2012', 'ModelNet40', 
-              'zoo', 'Mushroom', '20newsW100', 
+              'zoo', 'Mushroom', '20newsW100',
               'yelp', 'house-committees-100', 'walmart-trips-100']
 
 idx_list = ['num_node', 'num_he', 'num_feature', 'num_class', 

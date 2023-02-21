@@ -7,7 +7,7 @@
 
 
 dataset_list=( cora citeseer pubmed coauthor_cora coauthor_dblp \
-    NTU2012 ModelNet40 zoo Mushroom 20newsW100 \
+    NTU2012 ModelNet40 zoo Mushroom1 20newsW100 \
     yelp house-committees-100 walmart-trips-100 )
 lr=0.001
 wd=0

@@ -351,7 +351,7 @@ def load_data(dataset, remove_self_loop=False, feature_noise = 1):
     dname_list = ['cora', 'citeseer', 'pubmed',
                   'coauthor_cora', 'coauthor_dblp',
                   'NTU2012', 'ModelNet40', 
-                  'zoo', 'Mushroom', '20newsW100', 
+                  'zoo', 'Mushroom', '20newsW100',
                   'yelp', 'house-committees-100', 'walmart-trips-100']
 
     if dataset == 'ACM':

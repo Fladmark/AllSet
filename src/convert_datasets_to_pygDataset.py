@@ -44,7 +44,7 @@ class dataset_Hypergraph(InMemoryDataset):
                  transform=None, pre_transform=None):
         
         existing_dataset = ['20newsW100', 'ModelNet40', 'zoo', 
-                            'NTU2012', 'Mushroom', 
+                            'NTU2012', 'Mushroom',
                             'coauthor_cora', 'coauthor_dblp',
                             'yelp', 'amazon-reviews', 'walmart-trips', 'house-committees',
                             'walmart-trips-100', 'house-committees-100',
@@ -75,10 +75,9 @@ class dataset_Hypergraph(InMemoryDataset):
         
         super(dataset_Hypergraph, self).__init__(osp.join(root, name), transform, pre_transform)
 
-        
+
         
         self.data, self.slices = torch.load(self.processed_paths[0])
-
 
         self.data.train_percent = [self.data.train_percent]
         self.data.n_x = [self.data.n_x]

@@ -422,7 +422,6 @@ if __name__ == '__main__':
             data.y, train_prop=args.train_prop, valid_prop=args.valid_prop)
         split_idx_lst.append(split_idx)
     
-    
     # # Part 2: Load model
     
     

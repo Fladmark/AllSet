@@ -44,7 +44,7 @@ class dataset_Hypergraph(InMemoryDataset):
                  transform=None, pre_transform=None):
         
         existing_dataset = ['20newsW100', 'ModelNet40', 'zoo', 
-                            'NTU2012', 'Mushroom', 
+                            'NTU2012', 'Mushroom',
                             'coauthor_cora', 'coauthor_dblp',
                             'yelp', 'amazon-reviews', 'walmart-trips', 'house-committees',
                             'walmart-trips-100', 'house-committees-100',
