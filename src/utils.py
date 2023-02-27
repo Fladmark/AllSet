@@ -1,3 +1,4 @@
+import scipy
 import torch, math, numpy as np, scipy.sparse as sp
 import torch.nn as nn, torch.nn.functional as F, torch.nn.init as init
 import ipdb
@@ -212,10 +213,26 @@ def symnormalise(M):
     where D is the diagonal node-degree matrix
     """
     
-    d = np.array(M.sum(1))
-    
-    dhi = np.power(d, -1/2).flatten()
+    d = np.array(M.sum(1)).flatten()
+
+    # Fix for when node degree is negative. Fix for heterophilic data.
+    #d[d < 0] = 0
+
+    # Other attempted normalisation attempt
+
+    # multiplication_array = d.copy()
+    # multiplication_array[multiplication_array>0] = 1
+    # multiplication_array[multiplication_array<0] = -1
+    # d = abs(d)
+
+    dhi = np.power(d, -1/2)#.flatten()
+
+    #dhi = dhi + multiplication_array
+
+
     dhi[np.isinf(dhi)] = 0.
+    dhi[np.isnan(dhi)] = 0.
+
     DHI = sp.diags(dhi)    # D half inverse i.e. D^{-1/2}
     
     return (DHI.dot(M)).dot(DHI) 

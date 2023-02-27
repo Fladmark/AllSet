@@ -1,6 +1,6 @@
 from convert_datasets_to_pygDataset import dataset_Hypergraph
 from expansions import line_expansion
-from src.graph_utlis import normalize, sparse_mx_to_torch_sparse_tensor, evaluate_GCN
+from src.graph_utlis import normalize, sparse_mx_to_torch_sparse_tensor, evaluate_GCN, get_data
 from src.preprocessing import rand_train_test_idx, ExtractV2E
 from src.train import Logger, count_parameters, eval_acc
 
@@ -14,16 +14,13 @@ import os.path as osp
 import os
 import scipy.sparse as sp
 
-p2raw = '../data/AllSet_all_raw_data/cocitation/'
-p2raw = '../data/AllSet_all_raw_data/'
 dname = "Mushroom"
+dname = "house-committees-100"
+#dname = "cora"
+#dname = "zoo"
+#dname = "citeseer"
 
-dataset = dataset_Hypergraph(name=dname, root='../data/pyg_data/hypergraph_dataset_updated/',
-                             p2raw=p2raw)
-
-# dataset = dataset_Hypergraph(name=dname,
-#                              feature_noise=0,
-#                              p2raw=p2raw)
+dataset = get_data(dname)
 
 print(dataset.data)
 print(len(np.unique(dataset.data.y)))
@@ -60,21 +57,29 @@ dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
 # sparse back projection matrix
 PvT = sparse_mx_to_torch_sparse_tensor(PvT)
 
+print(dataset.data)
 
-runs = 10
-train_prop = 0.5
+runs = 1
+train_prop = 0.50
 valid_prop = 0.25
-lr = 0.001
-wd = 0
+lr = 0.01
+wd = 0.000001
 epochs = 50
+hidden = 64
+
 if dname == "cora":
     classes = 7
 elif dname == "Mushroom":
     classes = 2
 elif dname == "zoo":
     classes = 7
+    dataset.data.y = dataset.data.y - 1
 elif dname == "citeseer":
     classes = 7
+elif dname == "house-committees-100":
+    classes = 2
+    dataset.data.y = dataset.data.y - 1
+
 display_step = -1
 feature_noise = 0
 heads = 0
@@ -95,7 +100,7 @@ for run in range(runs):
     split_idx_lst.append(split_idx)
 
 
-model = graph_models.GCN(data.x.shape[1], 64, classes, 0)
+model = graph_models.GCN(data.x.shape[1], hidden, classes, 0)
 num_params = count_parameters(model)
 model.train()
 ### Training loop ###
@@ -110,12 +115,11 @@ for run in tqdm(range(runs)):
 
     best_val = float('-inf')
     for epoch in range(epochs):
-        #         Training part
+        # Training part
         print(epoch)
         model.train()
         optimizer.zero_grad()
         out = model(data.x, adj, PvT)
-        out = F.log_softmax(out, dim=1)
         loss = criterion(out[train_idx], data.y[train_idx])
         loss.backward()
         optimizer.step()
@@ -124,7 +128,7 @@ for run in tqdm(range(runs)):
         #         Evaluation part
         result = evaluate_GCN(model, data, split_idx, eval_func, adj, PvT)
         logger.add_result(run, result[:3])
-
+        print(result[0])
         if epoch % display_step == 0 and display_step > 0:
             print(f'Epoch: {epoch:02d}, '
                   f'Train Loss: {loss:.4f}, '
