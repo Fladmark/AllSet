@@ -22,8 +22,6 @@ dname = "house-committees-100"
 
 dataset = get_data(dname)
 
-print(dataset.data)
-print(len(np.unique(dataset.data.y)))
 # Hacky way of halfing the size of edge index (because dataset_Hypergraph for some reason duplicated this)
 single_edge_index = [[],[]]
 edge_index_overview = set()
@@ -40,16 +38,9 @@ for i in range(dataset.data.edge_index.shape[1]):
 
 dataset.data.edge_index = torch.tensor(single_edge_index)
 
-print(dataset.data)
-
 pairs = (dataset.data.edge_index.numpy().T)
 
-print(pairs)
-
 adj, Pv, PvT, Pe, PeT = line_expansion(pairs, dataset.data.y)
-
-print(Pv.shape)
-print(dataset.data.x.shape)
 
 # project features to LE
 dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
@@ -57,13 +48,12 @@ dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
 # sparse back projection matrix
 PvT = sparse_mx_to_torch_sparse_tensor(PvT)
 
-print(dataset.data)
 
 runs = 1
 train_prop = 0.50
 valid_prop = 0.25
-lr = 0.01
-wd = 0.000001
+lr = 0.02
+wd = 5e-3
 epochs = 50
 hidden = 64
 
@@ -101,6 +91,8 @@ for run in range(runs):
 
 
 model = graph_models.GCN(data.x.shape[1], hidden, classes, 0)
+#model = graph_models.SpGAT(data.x.shape[1], hidden, classes, 0)
+
 num_params = count_parameters(model)
 model.train()
 ### Training loop ###
@@ -119,8 +111,10 @@ for run in tqdm(range(runs)):
         print(epoch)
         model.train()
         optimizer.zero_grad()
+
         out = model(data.x, adj, PvT)
         loss = criterion(out[train_idx], data.y[train_idx])
+
         loss.backward()
         optimizer.step()
         #         if args.method == 'HNHN':
@@ -128,7 +122,6 @@ for run in tqdm(range(runs)):
         #         Evaluation part
         result = evaluate_GCN(model, data, split_idx, eval_func, adj, PvT)
         logger.add_result(run, result[:3])
-        print(result[0])
         if epoch % display_step == 0 and display_step > 0:
             print(f'Epoch: {epoch:02d}, '
                   f'Train Loss: {loss:.4f}, '

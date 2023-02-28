@@ -283,25 +283,32 @@ class HNHNConv(MessagePassing):
 #         x = torch.matmul(torch.diag(data.D_v_beta), x)
         x = data.D_v_beta.unsqueeze(-1) * x
 
-        self.flow = 'source_to_target'
-        out = self.propagate(hyperedge_index, x=x, norm=data.D_e_beta_inv,
-                             size=(num_nodes, num_edges))
-        
-        if self.nonlinear_inbetween:
-            out = F.relu(out)
-        
-        # sanity check
-        out = torch.squeeze(out, dim=1)
-        
-        out = self.weight_e2v(out)
-        
-#         out = torch.matmul(torch.diag(data.D_e_alpha), out)
-        out = data.D_e_alpha.unsqueeze(-1) * out
 
-        self.flow = 'target_to_source'
-        out = self.propagate(hyperedge_index, x=out, norm=data.D_v_alpha_inv,
-                             size=(num_edges, num_nodes))
-        
+
+#         self.flow = 'source_to_target'
+#         out = self.propagate(hyperedge_index, x=x, norm=data.D_e_beta_inv,
+#                              size=(num_nodes, num_edges))
+#
+#         if self.nonlinear_inbetween:
+#             out = F.relu(out)
+#
+#         # sanity check
+#         out = torch.squeeze(out, dim=1)
+#
+#         out = self.weight_e2v(out)
+#
+# #         out = torch.matmul(torch.diag(data.D_e_alpha), out)
+#         out = data.D_e_alpha.unsqueeze(-1) * out
+#         self.flow = 'target_to_source'
+#
+#         print(hyperedge_index)
+#         print(hyperedge_index.flip([0]))
+#         out = self.propagate(hyperedge_index, x=out, norm=data.D_v_alpha_inv,
+#                              size=(num_edges, num_nodes))
+
+        out = self.propagate(hyperedge_index, x=x, norm=data.D_e_beta_inv, size=(num_nodes, num_edges))
+        out = self.propagate(hyperedge_index.flip([0]), x=out, norm=data.D_v_alpha_inv,  size=(num_edges, num_nodes))
+
         return out
 
     def message(self, x_j, norm_i):
@@ -444,12 +451,16 @@ class HypergraphConv(MessagePassing):
             B = 1.0 / B
             B[B == float("inf")] = 0
 
-            self.flow = 'source_to_target'
-            out = self.propagate(hyperedge_index, x=x, norm=B, alpha=alpha,
-                                 size=(num_nodes, num_edges))
-            self.flow = 'target_to_source'
-            out = self.propagate(hyperedge_index, x=out, norm=D, alpha=alpha,
-                                 size=(num_edges, num_nodes))
+            # self.flow = 'source_to_target'
+            # out = self.propagate(hyperedge_index, x=x, norm=B, alpha=alpha,
+            #                      size=(num_nodes, num_edges))
+            # self.flow = 'target_to_source'
+            # out = self.propagate(hyperedge_index, x=out, norm=D, alpha=alpha,
+            #                      size=(num_edges, num_nodes))
+
+            out = self.propagate(hyperedge_index, x=x, norm=B, alpha=alpha, size=(num_nodes, num_edges))
+            out = self.propagate(hyperedge_index.flip([0]), x=out, norm=D, alpha=alpha, size=(num_edges, num_nodes))
+
         else:  # this correspond to HGNN
             D = scatter_add(hyperedge_weight[hyperedge_index[1]],
                             hyperedge_index[0], dim=0, dim_size=num_nodes)
@@ -638,8 +649,9 @@ class HalfNLHconv(MessagePassing):
     def message(self, x_j, norm):
         return norm.view(-1, 1) * x_j
 
+    # Made aggr="add" default instead of "None" as aggr was not passed
     def aggregate(self, inputs, index,
-                  dim_size=None, aggr=None):
+                  dim_size=None, aggr="add"):
         r"""Aggregates messages from neighbors as
         :math:`\square_{j \in \mathcal{N}(i)}`.
 

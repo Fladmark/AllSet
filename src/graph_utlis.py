@@ -36,8 +36,6 @@ def evaluate_GCN(model, data, split_idx, eval_func, adj, PvT, result=None):
         out = model(data.x, adj, PvT)
         out = F.log_softmax(out, dim=1)
 
-    print(out)
-
     train_acc = eval_func(
         data.y[split_idx['train']], out[split_idx['train']])
     valid_acc = eval_func(

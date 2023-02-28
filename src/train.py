@@ -261,7 +261,9 @@ if __name__ == '__main__':
     parser.add_argument('--PMA', action='store_true')
     #     Args for HyperGCN
     parser.add_argument('--HyperGCN_mediators', action='store_true')
+    #parser.add_argument('--HyperGCN_mediators', action='store_false')
     parser.add_argument('--HyperGCN_fast', action='store_true')
+    #parser.add_argument('--HyperGCN_fast', action='store_false')
     #     Args for Attentions: GAT and SetGNN
     parser.add_argument('--heads', default=1, type=int)  # Placeholder
     parser.add_argument('--output_heads', default=1, type=int)  # Placeholder
@@ -379,7 +381,7 @@ if __name__ == '__main__':
         H = ConstructH_HNHN(data)
         data = generate_norm_HNHN(H, data, args)
         data.edge_index[1] -= data.edge_index[1].min()
-    
+
     elif args.method in ['HCHA', 'HGNN']:
         data = ExtractV2E(data)
         if args.add_self_loop:
@@ -471,6 +473,7 @@ if __name__ == '__main__':
     #         scheduler = torch.optim.lr_scheduler.StepLR(optimizer,step_size=100, gamma=0.51)
         best_val = float('-inf')
         for epoch in range(args.epochs):
+            print(epoch)
             #         Training part
             model.train()
             optimizer.zero_grad()

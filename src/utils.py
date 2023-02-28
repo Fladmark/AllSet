@@ -110,7 +110,7 @@ def Laplacian(V, E, X, m):
         Se, Ie = hyperedge[s], hyperedge[i]
 
         # two stars with mediators
-        c = 2*len(hyperedge) - 3    # normalisation constant
+        c = 2*len(hyperedge) #- 3    # normalisation constant
         if m:
             
             # connect the supremum (Se) with the infimum (Ie)
@@ -139,7 +139,11 @@ def Laplacian(V, E, X, m):
 
             if (Ie,Se) not in weights:
                 weights[(Ie,Se)] = 0
-            weights[(Ie,Se)] += float(1/e)    
+            weights[(Ie,Se)] += float(1/e)
+
+        # for i in weights.values():
+        #     if i < 0:
+        #         print(i)
     
     return adjacency(edges, weights, V)
 
@@ -218,6 +222,10 @@ def symnormalise(M):
     # Fix for when node degree is negative. Fix for heterophilic data.
     #d[d < 0] = 0
 
+    for i in d:
+        if i < 0:
+            print(i)
+
     # Other attempted normalisation attempt
 
     # multiplication_array = d.copy()
@@ -231,7 +239,7 @@ def symnormalise(M):
 
 
     dhi[np.isinf(dhi)] = 0.
-    dhi[np.isnan(dhi)] = 0.
+    #dhi[np.isnan(dhi)] = 0.
 
     DHI = sp.diags(dhi)    # D half inverse i.e. D^{-1/2}
     
