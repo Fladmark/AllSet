@@ -40,7 +40,7 @@ dataset.data.edge_index = torch.tensor(single_edge_index)
 
 pairs = (dataset.data.edge_index.numpy().T)
 
-adj, Pv, PvT, Pe, PeT = line_expansion(pairs, dataset.data.y)
+adj, Pv, PvT, Pe, PeT = line_expansion(pairs, dataset.data.y, 30, 30)
 
 # project features to LE
 dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
@@ -91,6 +91,7 @@ for run in range(runs):
 
 
 model = graph_models.GCN(data.x.shape[1], hidden, classes, 0)
+#model = graph_models.GIN(data.x.shape[1], hidden, classes)
 #model = graph_models.SpGAT(data.x.shape[1], hidden, classes, 0)
 
 num_params = count_parameters(model)
@@ -113,6 +114,7 @@ for run in tqdm(range(runs)):
         optimizer.zero_grad()
 
         out = model(data.x, adj, PvT)
+        #out = model(data.x, data.edge_index, PvT)
         loss = criterion(out[train_idx], data.y[train_idx])
 
         loss.backward()
