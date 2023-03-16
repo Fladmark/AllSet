@@ -1,5 +1,5 @@
 from convert_datasets_to_pygDataset import dataset_Hypergraph
-from expansions import line_expansion
+from expansions import line_expansion, clique_expansion, line_graph
 from src.graph_utlis import normalize, sparse_mx_to_torch_sparse_tensor, evaluate_GCN, get_data
 from src.preprocessing import rand_train_test_idx, ExtractV2E
 from src.train import Logger, count_parameters, eval_acc
@@ -14,9 +14,9 @@ import os.path as osp
 import os
 import scipy.sparse as sp
 
-dname = "Mushroom"
-dname = "house-committees-100"
-#dname = "cora"
+#dname = "Mushroom"
+#dname = "house-committees-100"
+dname = "cora"
 #dname = "zoo"
 #dname = "citeseer"
 
@@ -40,7 +40,9 @@ dataset.data.edge_index = torch.tensor(single_edge_index)
 
 pairs = (dataset.data.edge_index.numpy().T)
 
-adj, Pv, PvT, Pe, PeT = line_expansion(pairs, dataset.data.y, 30, 30)
+#adj, Pv, PvT, Pe, PeT = line_expansion(pairs, dataset.data.y, 30, 30)
+#adj, Pv, PvT = clique_expansion(pairs, dataset.data.y)
+adj, Pv, PvT = line_graph(pairs, dataset.data.y)
 
 # project features to LE
 dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))

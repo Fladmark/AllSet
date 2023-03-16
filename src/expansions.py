@@ -3,6 +3,7 @@ Code from: https://github.com/ycq091044/LEGCN/blob/master/src/LE.py
 """
 
 import numpy as np
+import torch
 import scipy.sparse as sp
 from itertools import combinations
 
@@ -100,4 +101,90 @@ def line_expansion(pairs, y,v_threshold=30, e_threshold=30):
     adj = sparse_mx_to_torch_sparse_tensor(adj)
 
     return adj, Pv, PvT, Pe, PeT
+
+def clique_expansion(pairs, y):
+    N_node = len(y)
+    N_vertex = len(y)
+
+    hyper_edge_dict = dict()
+    # Loop over vertex-hyperedge pairs
+    for pair in pairs:
+        edge_id = pair[1]
+        vertex_id = pair[0]
+        if hyper_edge_dict.get(edge_id) == None:
+            hyper_edge_dict[edge_id] = [vertex_id]
+        else:
+            hyper_edge_dict[edge_id] = hyper_edge_dict[edge_id] + [vertex_id]
+
+    # Make edge list
+    edges = []
+
+    for vertices in hyper_edge_dict.values():
+        for idx_1 in range(len(vertices)):
+            for idx_2 in range(idx_1 + 1, len(vertices)):
+                edges.append((vertices[idx_1], vertices[idx_2]))
+
+
+    # Make adjacency matrix
+    edges = np.array(edges)
+    adj = sp.coo_matrix((np.ones(edges.shape[0]), (edges[:, 0], edges[:, 1])),
+                        shape=(N_node, N_node), dtype=np.float32)
+
+    # Makes adj symmetric
+    adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
+    adj = normalize(adj + 2.0 * sp.eye(adj.shape[0]))
+    adj = sparse_mx_to_torch_sparse_tensor(adj)
+
+    # vertex projection: from vertex to node
+    Pv = sp.coo_matrix(torch.eye(N_node),
+                       shape=(N_node, N_vertex), dtype=np.float32)  # (N_node, N_vertex)
+
+    PvT = sp.coo_matrix(torch.eye(N_node),
+                       shape=(N_node, N_vertex), dtype=np.float32)  # (N_node, N_vertex)
+
+    return adj, Pv, PvT
+
+def star_expansion(pairs, y):
+    # Not implemented yet
+
+    # Get number of hyperedges - number of new nodes to add
+
+    # Add edges based on hyperedge membership
+
+    # Create adjacency matrix
+
+    # Compute projections
+
+    return None
+    # return adj, Pv
+
+def lawler_expansion(pairs, y):
+    # Not implemented yet
+
+    return None
+
+def line_graph(pairs, y):
+    # Not implemented yet
+    N_vertex = len(y)
+
+    # Get number of hyperedges = number of vertices in new graph
+    hyper_edge_dict = dict()
+    for pair in pairs:
+        edge_id = pair[1]
+        vertex_id = pair[0]
+        if hyper_edge_dict.get(edge_id) == None:
+            hyper_edge_dict[edge_id] = {vertex_id}
+        else:
+            hyper_edge_dict[edge_id] = hyper_edge_dict[edge_id].add(vertex_id)
+    N_node = len(hyper_edge_dict)
+
+    # Add edges
+    edges = []
+
+    # Compute projections
+    Pv = sp.coo_matrix((np.ones(N_node), (np.arange(N_node), pairs[:, 0])),
+                       shape=(N_node, N_vertex), dtype=np.float32)
+    print(Pv)
+
+    return None
 
