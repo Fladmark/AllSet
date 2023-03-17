@@ -41,11 +41,17 @@ def line_expansion(pairs, y,v_threshold=30, e_threshold=30):
 
     N_node = pairs.shape[0]
     #print(N_vertex)
+    print(pairs)
 
     # vertex projection: from vertex to node
     Pv = sp.coo_matrix((np.ones(N_node), (np.arange(N_node), pairs[:, 0])),
                        shape=(N_node, N_vertex), dtype=np.float32)  # (N_node, N_vertex)
     # vertex back projection (Pv Transpose): from node to vertex
+    #print(pairs[:, 0])
+    #for val in pairs[:, 0]:
+    #    print(val)
+    temp = Pv.toarray()
+    #print(Pv)
 
     weight = np.ones(N_node)
     for vertex in range(N_vertex):
@@ -164,8 +170,13 @@ def lawler_expansion(pairs, y):
     return None
 
 def line_graph(pairs, y):
-    # Not implemented yet
+
     N_vertex = len(y)
+
+    # Encode hyper-edges
+    uniq_hyperedge = np.unique(pairs[:, 1])
+    pairs[:, 1] = list(map({hyperedge: i for i, hyperedge in enumerate(uniq_hyperedge)}.get, pairs[:, 1]))
+    N_node = len(uniq_hyperedge)
 
     # Get number of hyperedges = number of vertices in new graph
     hyper_edge_dict = dict()
@@ -175,16 +186,67 @@ def line_graph(pairs, y):
         if hyper_edge_dict.get(edge_id) == None:
             hyper_edge_dict[edge_id] = {vertex_id}
         else:
-            hyper_edge_dict[edge_id] = hyper_edge_dict[edge_id].add(vertex_id)
-    N_node = len(hyper_edge_dict)
+            hyper_edge_dict[edge_id].add(vertex_id)
 
     # Add edges
     edges = []
 
-    # Compute projections
-    Pv = sp.coo_matrix((np.ones(N_node), (np.arange(N_node), pairs[:, 0])),
-                       shape=(N_node, N_vertex), dtype=np.float32)
-    print(Pv)
+    # Loop over hyperedges (i.e., nodes in new graph)
+    for idx_1 in range(N_node):
+        for idx_2 in range(idx_1 + 1, N_node):
+        #for idx_2 in range(N_node): # change
+            #if idx_1 == idx_2: # change
+            #    continue
+            # Get vertices in each hyperedge
+            vertices_1 = hyper_edge_dict.get(idx_1)
+            vertices_2 = hyper_edge_dict.get(idx_2)
+            if vertices_1 != None and vertices_2 != None:
+                # Find intersection
+                intersection = vertices_1.intersection(vertices_2)
+                # If hyperedges intersect, add an edge
+                if len(intersection) > 0:
+                    edges.append((idx_1, idx_2))
 
-    return None
+    # Make adjacency matrix
+    edges = np.array(edges)
+    adj = sp.coo_matrix((np.ones(edges.shape[0]), (edges[:, 0], edges[:, 1])),
+                        shape=(N_node, N_node), dtype=np.float32)
+
+    # Makes adj symmetric (I don't understand this part)
+    adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
+    adj = normalize(adj + 2.0 * sp.eye(adj.shape[0]))
+
+    adj = sparse_mx_to_torch_sparse_tensor(adj)
+
+    # Compute Pv projection
+    dense_Pv = torch.zeros(N_node, N_vertex)
+    for row in range(N_node):
+        vertices = hyper_edge_dict.get(row)
+        divisor = len(vertices)
+        if divisor > 0:
+            for column in vertices:
+                dense_Pv[row, column] = 1. / divisor
+
+    # Convert to sparse matrix
+    Pv = sp.coo_matrix(dense_Pv)
+
+    # Compute PvT projection
+    dense_PvT = torch.zeros(N_vertex, N_node)
+
+    # Loop over old vertices
+    for row in range(N_vertex):
+        # Find hyperedges that this vertex was a member of
+        hyper_edge_membership = []
+        for hyper_edge in range(N_node):
+            if row in hyper_edge_dict.get(hyper_edge):
+                hyper_edge_membership.append(hyper_edge)
+        divisor = len(hyper_edge_membership)
+        if divisor > 0:
+            for column in hyper_edge_membership:
+                dense_PvT[row, column] = 1. / divisor
+
+    # Convert to sparse matrix
+    PvT = sp.coo_matrix(dense_PvT)
+
+    return adj, Pv, PvT
 
