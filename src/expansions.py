@@ -150,19 +150,97 @@ def clique_expansion(pairs, y):
 
     return adj, Pv, PvT
 
-def star_expansion(pairs, y):
-    # Not implemented yet
+def star_expansion(pairs, y, method=1):
+
+    N_vertex = len(y)
 
     # Get number of hyperedges - number of new nodes to add
+    uniq_hyperedge = np.unique(pairs[:, 1])
+    N_hyper_edges = len(uniq_hyperedge)
+
+    # Re-encode hyperedges
+    pairs[:, 1] = list(map({hyperedge: i+N_vertex for i, hyperedge in enumerate(uniq_hyperedge)}.get, pairs[:, 1]))
+
+    # Number of nodes in new graph
+    N_node = N_vertex + N_hyper_edges
+
+    # Get hyperedge membership information
+    hyper_edge_dict = dict()
+    for pair in pairs:
+        edge_id = pair[1]
+        vertex_id = pair[0]
+        if hyper_edge_dict.get(edge_id) == None:
+            hyper_edge_dict[edge_id] = {vertex_id}
+        else:
+            hyper_edge_dict[edge_id].add(vertex_id)
 
     # Add edges based on hyperedge membership
+    edges = []
 
-    # Create adjacency matrix
+    # Loop over vertices
+    for vertex in range(N_vertex):
+        # Loop over hyperedges
+        for hyperedge in hyper_edge_dict.keys():
+            # If vertex belongs to hyperedge, add edge in new graph
+            if vertex in hyper_edge_dict[hyperedge]:
+                edges.append((vertex, hyperedge))
 
-    # Compute projections
+    # Make adjacency matrix
+    edges = np.array(edges)
+    adj = sp.coo_matrix((np.ones(edges.shape[0]), (edges[:, 0], edges[:, 1])),
+                        shape=(N_node, N_node), dtype=np.float32)
 
-    return None
-    # return adj, Pv
+    # Makes adj symmetric (I don't understand this part)
+    adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
+    adj = normalize(adj + 2.0 * sp.eye(adj.shape[0]))
+
+    adj = sparse_mx_to_torch_sparse_tensor(adj)
+
+    # Compute Pv
+    dense_Pv = torch.zeros(N_node, N_vertex)
+
+    # Identity projection for existing vertices
+    for i in range(N_vertex):
+        dense_Pv[i, i] = 1.
+
+    # Projection for added nodes
+    for row in range(N_vertex, N_node):
+        vertices = hyper_edge_dict.get(row)
+        divisor = len(vertices)
+        if divisor > 0:
+            for column in vertices:
+                dense_Pv[row, column] = 1. / divisor
+
+    # Convert to sparse matrix
+    Pv = sp.coo_matrix(dense_Pv)
+
+    # Compute PvT
+    dense_PvT = torch.zeros(N_vertex, N_node)
+
+    # Approach 1: Remove hyperedge nodes
+    if method == 1:
+        # Directly project original vertices
+        for i in range(N_vertex):
+            dense_PvT[i, i] = 1.
+
+    # Approach 2: Incorporate hyperedge nodes
+    elif method == 2:
+        # Loop over original vertices
+        for row in range(N_vertex):
+            # Find hyperedges that this vertex was a member of
+            hyper_edge_membership = []
+            for hyper_edge in hyper_edge_dict.keys():
+                if row in hyper_edge_dict.get(hyper_edge):
+                    hyper_edge_membership.append(hyper_edge)
+            divisor = len(hyper_edge_membership) + 1 # +1 because self included
+            for column in hyper_edge_membership:
+                dense_PvT[row, column] = 1. / divisor
+            dense_PvT[row, row] = 1. / divisor
+
+    # Convert to sparse matrix
+    PvT = sp.coo_matrix(dense_PvT)
+
+    return adj, Pv, PvT
 
 def lawler_expansion(pairs, y):
     # Not implemented yet
