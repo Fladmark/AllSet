@@ -466,6 +466,7 @@ class ChebyNet(nn.Module):
             x = self.relu(x)
             x = self.dropout(x)
         x = self.cheb_graph_convs[-1](x, self.gso)
+        x = torch.spmm(PvT, x)
         x = self.log_softmax(x)
 
         return x

@@ -16,9 +16,9 @@ import scipy.sparse as sp
 import graph_utlis
 
 #dname = "Mushroom"
-#dname = "house-committees-100"
+dname = "house-committees-100"
 #dname = "cora"
-dname = "zoo"
+#dname = "zoo"
 #dname = "citeseer"
 
 dataset = get_data(dname)
@@ -43,12 +43,12 @@ pairs = (dataset.data.edge_index.numpy().T)
 
 # Choose expansion
 #adj, Pv, PvT, Pe, PeT = line_expansion(pairs, dataset.data.y, 30, 30)
-adj, Pv, PvT = line_expansion_2(pairs, dataset.data.y, 30, 30)
+#adj, Pv, PvT = line_expansion_2(pairs, dataset.data.y, 30, 30)
 #adj, Pv, PvT = clique_expansion(pairs, dataset.data.y)
 #adj, Pv, PvT = line_graph(pairs, dataset.data.y)
 #adj, Pv, PvT = star_expansion(pairs, dataset.data.y, method=1)
 #adj, Pv, PvT = star_expansion(pairs, dataset.data.y, method=2)
-#adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=1)
+adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=1)
 #adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=2)
 
 # project features to LE
@@ -63,7 +63,7 @@ train_prop = 0.50
 valid_prop = 0.25
 lr = 0.02
 wd = 5e-3
-epochs = 500
+epochs = 50
 hidden = 64
 
 if dname == "cora":
