@@ -17,8 +17,8 @@ import scipy.sparse as sp
 #dname = "Mushroom"
 #dname = "house-committees-100"
 #dname = "cora"
-dname = "zoo"
-#dname = "citeseer"
+#dname = "zoo"
+dname = "citeseer"
 
 dataset = get_data(dname)
 
@@ -42,13 +42,14 @@ pairs = (dataset.data.edge_index.numpy().T)
 
 # Choose expansion
 #adj, Pv, PvT, Pe, PeT = line_expansion(pairs, dataset.data.y, 30, 30)
-adj, Pv, PvT = line_expansion_2(pairs, dataset.data.y, 30, 30)
+#adj, Pv, PvT = line_expansion_2(pairs, dataset.data.y, 30, 30)
 #adj, Pv, PvT = clique_expansion(pairs, dataset.data.y)
 #adj, Pv, PvT = line_graph(pairs, dataset.data.y)
 #adj, Pv, PvT = star_expansion(pairs, dataset.data.y, method=1)
 #adj, Pv, PvT = star_expansion(pairs, dataset.data.y, method=2)
-#adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=1)
+adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=1)
 #adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=2)
+print("number of nodes: " + str(len(dataset.data.y)))
 
 # project features to LE
 dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
@@ -57,7 +58,7 @@ dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
 PvT = sparse_mx_to_torch_sparse_tensor(PvT)
 
 
-runs = 20
+runs = 1
 train_prop = 0.50
 valid_prop = 0.25
 lr = 0.02
@@ -97,10 +98,13 @@ for run in range(runs):
         data.y, train_prop=train_prop, valid_prop=valid_prop)
     split_idx_lst.append(split_idx)
 
-
-model = graph_models.GCN(data.x.shape[1], hidden, classes, 0)
-#model = graph_models.GIN(data.x.shape[1], hidden, classes)
+# Choose GNN
+#model = graph_models.GCN(data.x.shape[1], hidden, classes, 0)
+#model = graph_models.GIN(data.x.shape[1], hidden, classes) # does not work
 #model = graph_models.SpGAT(data.x.shape[1], hidden, classes, 0)
+#model = graph_models.GAT(data.x.shape[1], hidden, classes, 0)
+#model = graph_models.GINq(data.x.shape[1], hidden, classes) # does not work
+model = graph_models.MPNNNodeClassifier(data.x.shape[1], hidden, classes)
 
 num_params = count_parameters(model)
 model.train()
@@ -123,6 +127,8 @@ for run in tqdm(range(runs)):
 
         out = model(data.x, adj, PvT)
         #out = model(data.x, data.edge_index, PvT)
+        #train_idx = torch.tensor(train_idx).long()
+        #print(train_idx)
         loss = criterion(out[train_idx], data.y[train_idx])
 
         loss.backward()

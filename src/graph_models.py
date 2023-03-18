@@ -9,8 +9,11 @@ import torch.nn.functional as F
 from graph_layers import GraphConvolution, GraphAttentionLayer, SpGraphAttentionLayer
 from torch.nn import Linear, Sequential, BatchNorm1d, ReLU, Dropout, Embedding
 from torch_geometric.nn import GCNConv, GINConv
+from torch_geometric.nn import MessagePassing
 from torch_geometric.nn import global_mean_pool, global_add_pool
 from torch_scatter import scatter_sum
+from torch_geometric.utils import add_self_loops, degree
+import scipy.sparse as sp
 
 class GCN(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout):
@@ -20,16 +23,25 @@ class GCN(nn.Module):
         self.gc2 = GraphConvolution(nhid, nclass)
         self.layers = [self.gc1, self.gc2]
         self.dropout = dropout
+        print("nfeat: " + str(nfeat))
+        print("nclass: " + str(nclass))
+        print("nhid: " + str(nhid))
 
     def forward(self, x, adj, PvT):
         x = F.relu(self.gc1(x, adj))
         x = F.dropout(x, self.dropout, training=self.training)
+        print("start")
+        print(x.shape)
 
         # x = F.relu(self.gc3(x, adj))
         # x = F.dropout(x, self.dropout, training=self.training)
 
         x = self.gc2(x, adj)
+        print(x.shape)
         x = torch.spmm(PvT, x)
+        print(x.shape)
+
+        print(F.log_softmax(x, dim=1).shape)
 
         return F.log_softmax(x, dim=1)
 
@@ -202,6 +214,7 @@ class GINLayer(nn.Module):
         # ============ YOUR CODE HERE =============
         # aggregate the neighbours as in GIN: (AX + (1+eps)X)
         print(adj_sparse.shape, x.shape)
+        x = x.float() # fix
         x = torch.mm(adj_sparse, x) + (1 + self.eps) * x
         # project the features (MLP_k)
         out = self.linear2(F.relu(self.linear1(x)))
@@ -250,10 +263,12 @@ class GIN(nn.Module):
         adj_sparse = adj
 
         x = self.embed_x(x)
+        #print(x.shape)
 
         batch = torch.zeros(adj.shape[1]).type(torch.LongTensor)
 
         catter = scatter_sum(x, batch, dim=0)
+        #print(catter.shape)
 
         # ============ YOUR CODE HERE =============
         # perform the forward pass with the new readout function
@@ -264,15 +279,80 @@ class GIN(nn.Module):
 
             ssum = scatter_sum(x, batch, dim=0)
             catter = torch.cat((catter, ssum), dim=1)
+        #print(x.shape)
 
         y_hat = self.pred_layers(catter).flatten()
+        #print(y_hat.shape)
 
         # =========================================
         # return also the final node embeddings (for visualisations)
-        return y_hat, x
+        #return y_hat#, x
+        x = torch.spmm(PvT, x)
+        return F.log_softmax(x, dim=1)
 
     def reset_parameters(self):
         self.embed_x.reset_parameters()
         for layer in self.layers:
             layer.reset_parameters()
         self.pred_layers.reset_parameters()
+
+# Not used
+def sparse_adjacency_matrix_to_edge_index(sparse_adj_matrix):
+    sparse_adj_matrix = sparse_adj_matrix.tocoo()
+    row, col = sparse_adj_matrix.row, sparse_adj_matrix.col
+    edge_index = torch.stack((torch.tensor(row), torch.tensor(col)), dim=0)
+    return edge_index
+
+def sparse_tensor_to_edge_index(sparse_adj_tensor):
+    row, col = sparse_adj_tensor.coalesce().indices()
+    edge_index = torch.stack((row, col), dim=0)
+    return edge_index
+
+class MPNNConv(MessagePassing):
+    def __init__(self, in_channels, out_channels):
+        super(MPNNConv, self).__init__(aggr='add')  # Aggregates messages by addition
+        self.lin = nn.Linear(in_channels, out_channels)
+        self.act = nn.ReLU()
+
+    def forward(self, x, edge_index):
+        edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
+        return self.propagate(edge_index, size=(x.size(0), x.size(0)), x=x)
+
+    def message(self, x_j, edge_index, size):
+        x_j = self.lin(x_j)
+        x_j = self.act(x_j)
+        return x_j
+
+    def update(self, aggr_out):
+        return aggr_out
+
+class MPNNNodeClassifier(nn.Module):
+    def __init__(self, input_dim, hidden_dim, num_classes):
+        super(MPNNNodeClassifier, self).__init__()
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.num_classes = num_classes
+        self.conv1 = MPNNConv(input_dim, hidden_dim)
+        self.conv2 = MPNNConv(hidden_dim, hidden_dim)
+        self.fc = nn.Linear(hidden_dim, num_classes)
+        self.layers = [self.conv1, self.conv2, self.fc]
+
+    def forward(self, x, adj, PvT):
+        #x, edge_index = data.x, data.edge_index
+        edge_index = sparse_tensor_to_edge_index(adj)
+        x = self.conv1(x, edge_index)
+        x = F.relu(x)
+        x = F.dropout(x, p=0.5, training=self.training)
+        x = self.conv2(x, edge_index)
+        x = F.relu(x)
+        x = F.dropout(x, p=0.5, training=self.training)
+        x = self.fc(x)
+        x = torch.spmm(PvT, x)
+        return F.log_softmax(x, dim=1)
+
+    def reset_parameters(self):
+        self.conv1 = MPNNConv(self.input_dim, self.hidden_dim)
+        self.conv2 = MPNNConv(self.hidden_dim, self.hidden_dim)
+        self.fc = nn.Linear(self.hidden_dim, self.num_classes)
+        #for layer in self.layers:
+        #    layer.reset_parameters()
