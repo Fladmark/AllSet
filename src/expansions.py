@@ -32,6 +32,9 @@ def line_expansion(pairs, y,v_threshold=30, e_threshold=30):
     uniq_vertex = np.unique(pairs[:, 0])
     #N_vertex = len(uniq_vertex)
     N_vertex = len(y)
+    print("number of vertices in hypergraph: " + str(N_vertex))
+    print("number of vertices in hyperedges: " + str(len(uniq_vertex)))
+    print(np.amax(uniq_vertex))
     pairs[:, 0] = list(map({vertex: i for i, vertex in enumerate(uniq_vertex)}.get, pairs[:, 0]))
 
     # get # of hyperedges and encode them starting from 0
@@ -40,18 +43,11 @@ def line_expansion(pairs, y,v_threshold=30, e_threshold=30):
     pairs[:, 1] = list(map({hyperedge: i for i, hyperedge in enumerate(uniq_hyperedge)}.get, pairs[:, 1]))
 
     N_node = pairs.shape[0]
-    #print(N_vertex)
-    print(pairs)
 
     # vertex projection: from vertex to node
     Pv = sp.coo_matrix((np.ones(N_node), (np.arange(N_node), pairs[:, 0])),
                        shape=(N_node, N_vertex), dtype=np.float32)  # (N_node, N_vertex)
     # vertex back projection (Pv Transpose): from node to vertex
-    #print(pairs[:, 0])
-    #for val in pairs[:, 0]:
-    #    print(val)
-    temp = Pv.toarray()
-    #print(Pv)
 
     weight = np.ones(N_node)
     for vertex in range(N_vertex):
@@ -107,6 +103,95 @@ def line_expansion(pairs, y,v_threshold=30, e_threshold=30):
     adj = sparse_mx_to_torch_sparse_tensor(adj)
 
     return adj, Pv, PvT, Pe, PeT
+
+def line_expansion_2(pairs, y,v_threshold=30, e_threshold=30):
+    # get # of vertices
+    N_vertex = len(y)
+
+    # get # of hyperedges and encode them starting from 0
+    uniq_hyperedge = np.unique(pairs[:, 1])
+    N_hyperedge = len(uniq_hyperedge)
+    pairs[:, 1] = list(map({hyperedge: i for i, hyperedge in enumerate(uniq_hyperedge)}.get, pairs[:, 1]))
+
+    # Compute hyperedge-membership
+    hyper_edge_dict = dict()
+    for pair in pairs:
+        edge_id = pair[1]
+        vertex_id = pair[0]
+        if hyper_edge_dict.get(vertex_id) == None:
+            hyper_edge_dict[vertex_id] = {edge_id}
+        else:
+            hyper_edge_dict[vertex_id].add(edge_id)
+
+    # Compute the number of nodes in new graph
+    N_node = N_vertex # Original nodes are preserved
+    # Add extra nodes for hyper-edge membership
+    for vertex_id in hyper_edge_dict.keys():
+        N_node += len(hyper_edge_dict[vertex_id]) - 1 # minus 1 because original node is already counted
+
+    # Compute Pv
+    dense_Pv = torch.zeros(N_node, N_vertex)
+
+    # Loop over vertices in hypergraph
+    idx = 0
+    for vertex_id in range(N_vertex):
+        hyperedges = hyper_edge_dict.get(vertex_id)
+        # If member of no hyperedge
+        if hyperedges == None:
+            dense_Pv[idx, vertex_id] = 1.
+            idx += 1
+        # If member of hyperedges
+        else:
+            num_hyperedges = len(hyperedges)
+            for j in range(num_hyperedges):
+                dense_Pv[idx+j, vertex_id] = 1.
+            idx += num_hyperedges
+
+    # Convert to sparse matrix
+    Pv = sp.coo_matrix(dense_Pv)
+
+    # Compute PvT
+    dense_PvT = torch.zeros(N_vertex, N_node)
+
+    idx = 0
+    for vertex_id in range(N_vertex):
+        hyperedges = hyper_edge_dict.get(vertex_id)
+        # If member of no hyperedge
+        if hyperedges == None:
+            dense_PvT[vertex_id, idx] = 1.
+            idx += 1
+        # If member of hyperedges
+        else:
+            num_hyperedges = len(hyperedges)
+            for j in range(num_hyperedges):
+                dense_PvT[vertex_id, idx+j] = 1. / num_hyperedges
+            idx += num_hyperedges
+
+    # Convert to sparse matrix
+    PvT = sp.coo_matrix(dense_PvT)
+
+    # construct adj
+    edges = []
+    # get vertex-similar edges
+    for vertex in range(N_vertex):
+        position = np.where(pairs[:, 0] == vertex)[0]
+        edges += list(combinations(position, r=2))
+
+    # get hyperedge-similar edges
+    for hyperedge in range(N_hyperedge):
+        position = np.where(pairs[:, 1] == hyperedge)[0]
+        edges += list(combinations(position, r=2))
+
+    edges = np.array(edges)
+    adj = sp.coo_matrix((np.ones(edges.shape[0]), (edges[:, 0], edges[:, 1])),
+                        shape=(N_node, N_node), dtype=np.float32)
+
+    # Makes adj symmetric
+    adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
+    adj = normalize(adj + 2.0 * sp.eye(adj.shape[0]))
+    adj = sparse_mx_to_torch_sparse_tensor(adj)
+
+    return adj, Pv, PvT
 
 def clique_expansion(pairs, y):
     N_node = len(y)
@@ -288,7 +373,7 @@ def lawler_expansion(pairs, y, method=1):
                         shape=(N_node, N_node), dtype=np.float32)
 
     # Makes adj symmetric (I don't understand this part)
-    adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
+    #adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
     adj = normalize(adj + 2.0 * sp.eye(adj.shape[0]))
 
     adj = sparse_mx_to_torch_sparse_tensor(adj)

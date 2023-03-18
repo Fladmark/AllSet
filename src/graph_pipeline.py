@@ -1,5 +1,5 @@
 from convert_datasets_to_pygDataset import dataset_Hypergraph
-from expansions import line_expansion, clique_expansion, line_graph, star_expansion, lawler_expansion
+from expansions import line_expansion, clique_expansion, line_graph, star_expansion, lawler_expansion, line_expansion_2
 from src.graph_utlis import normalize, sparse_mx_to_torch_sparse_tensor, evaluate_GCN, get_data
 from src.preprocessing import rand_train_test_idx, ExtractV2E
 from src.train import Logger, count_parameters, eval_acc
@@ -17,8 +17,8 @@ import scipy.sparse as sp
 #dname = "Mushroom"
 #dname = "house-committees-100"
 #dname = "cora"
-#dname = "zoo"
-dname = "citeseer"
+dname = "zoo"
+#dname = "citeseer"
 
 dataset = get_data(dname)
 
@@ -42,12 +42,13 @@ pairs = (dataset.data.edge_index.numpy().T)
 
 # Choose expansion
 #adj, Pv, PvT, Pe, PeT = line_expansion(pairs, dataset.data.y, 30, 30)
+adj, Pv, PvT = line_expansion_2(pairs, dataset.data.y, 30, 30)
 #adj, Pv, PvT = clique_expansion(pairs, dataset.data.y)
 #adj, Pv, PvT = line_graph(pairs, dataset.data.y)
 #adj, Pv, PvT = star_expansion(pairs, dataset.data.y, method=1)
 #adj, Pv, PvT = star_expansion(pairs, dataset.data.y, method=2)
 #adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=1)
-adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=2)
+#adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=2)
 
 # project features to LE
 dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
@@ -56,7 +57,7 @@ dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
 PvT = sparse_mx_to_torch_sparse_tensor(PvT)
 
 
-runs = 1
+runs = 20
 train_prop = 0.50
 valid_prop = 0.25
 lr = 0.02
