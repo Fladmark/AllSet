@@ -28,25 +28,19 @@ class GCN(nn.Module):
         self.gc2 = GraphConvolution(nhid, nclass)
         self.layers = [self.gc1, self.gc2]
         self.dropout = dropout
-        print("nfeat: " + str(nfeat))
-        print("nclass: " + str(nclass))
-        print("nhid: " + str(nhid))
+
 
     def forward(self, x, adj, PvT):
         x = F.relu(self.gc1(x, adj))
         x = F.dropout(x, self.dropout, training=self.training)
-        print("start")
-        print(x.shape)
+
 
         # x = F.relu(self.gc3(x, adj))
         # x = F.dropout(x, self.dropout, training=self.training)
 
         x = self.gc2(x, adj)
-        print(x.shape)
         x = torch.spmm(PvT, x)
-        print(x.shape)
 
-        print(F.log_softmax(x, dim=1).shape)
 
         return F.log_softmax(x, dim=1)
 

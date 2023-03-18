@@ -7,7 +7,7 @@ import scipy.sparse as sp
 from scipy.sparse.linalg import eigsh
 import torch
 # from LEGCN
-from src.convert_datasets_to_pygDataset import dataset_Hypergraph
+from convert_datasets_to_pygDataset import dataset_Hypergraph
 
 
 def normalize(mx):

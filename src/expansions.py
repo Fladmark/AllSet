@@ -7,7 +7,7 @@ import torch
 import scipy.sparse as sp
 from itertools import combinations
 
-from src.graph_utlis import normalize, sparse_mx_to_torch_sparse_tensor
+from graph_utlis import normalize, sparse_mx_to_torch_sparse_tensor
 
 
 def line_expansion(pairs, y,v_threshold=30, e_threshold=30):

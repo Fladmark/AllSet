@@ -1,8 +1,8 @@
 from convert_datasets_to_pygDataset import dataset_Hypergraph
 from expansions import line_expansion, clique_expansion, line_graph, star_expansion, lawler_expansion, line_expansion_2
-from src.graph_utlis import normalize, sparse_mx_to_torch_sparse_tensor, evaluate_GCN, get_data
-from src.preprocessing import rand_train_test_idx, ExtractV2E
-from src.train import Logger, count_parameters, eval_acc
+from graph_utlis import normalize, sparse_mx_to_torch_sparse_tensor, evaluate_GCN, get_data
+from preprocessing import rand_train_test_idx, ExtractV2E
+from train import Logger, count_parameters, eval_acc
 
 from tqdm import tqdm
 import time
@@ -14,9 +14,14 @@ import os.path as osp
 import os
 import scipy.sparse as sp
 import graph_utlis
+import sys
+
+dname, model_name, expansion_name = sys.argv[1:]
+
+print(dname, model_name, expansion_name)
 
 #dname = "Mushroom"
-dname = "house-committees-100"
+#dname = "house-committees-100"
 #dname = "cora"
 #dname = "zoo"
 #dname = "citeseer"
@@ -42,13 +47,30 @@ dataset.data.edge_index = torch.tensor(single_edge_index)
 pairs = (dataset.data.edge_index.numpy().T)
 
 # Choose expansion
+#expansion_name = "line_expansion"
+
+if expansion_name == "line_expansion":
+    adj, Pv, PvT = line_expansion_2(pairs, dataset.data.y, 30, 30)
+elif expansion_name == "clique_expansion":
+    adj, Pv, PvT = clique_expansion(pairs, dataset.data.y)
+elif expansion_name == "line_graph":
+    adj, Pv, PvT = line_graph(pairs, dataset.data.y)
+elif expansion_name == "star_expansion_1":
+    adj, Pv, PvT = star_expansion(pairs, dataset.data.y, method=1)
+elif expansion_name == "star_expansion_2":
+    adj, Pv, PvT = star_expansion(pairs, dataset.data.y, method=2)
+elif expansion_name == "lawler_expansion_1":
+    adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=1)
+elif expansion_name == "lawler_expansion_2":
+    adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=2)
+
 #adj, Pv, PvT, Pe, PeT = line_expansion(pairs, dataset.data.y, 30, 30)
 #adj, Pv, PvT = line_expansion_2(pairs, dataset.data.y, 30, 30)
 #adj, Pv, PvT = clique_expansion(pairs, dataset.data.y)
 #adj, Pv, PvT = line_graph(pairs, dataset.data.y)
 #adj, Pv, PvT = star_expansion(pairs, dataset.data.y, method=1)
 #adj, Pv, PvT = star_expansion(pairs, dataset.data.y, method=2)
-adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=1)
+#adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=1)
 #adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=2)
 
 # project features to LE
@@ -58,12 +80,12 @@ dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
 PvT = sparse_mx_to_torch_sparse_tensor(PvT)
 
 
-runs = 3
+runs = 1
 train_prop = 0.50
 valid_prop = 0.25
-lr = 0.02
-wd = 5e-3
-epochs = 50
+lr = 0.001
+wd = 0
+epochs = 500
 hidden = 64
 
 if dname == "cora":
@@ -98,15 +120,25 @@ for run in range(runs):
         data.y, train_prop=train_prop, valid_prop=valid_prop)
     split_idx_lst.append(split_idx)
 
-gso = graph_utlis.calc_gso(adj, 'sym_norm_lap')
-gso = graph_utlis.calc_chebynet_gso(gso)
-gso = graph_utlis.cnv_sparse_mat_to_coo_tensor(gso, 'cpu')
+#model_name = "GCN"
+
+if model_name == "GCN":
+    model = graph_models.GCN(data.x.shape[1], hidden, classes, 0)
+elif model_name == "SpGAT":
+    model = graph_models.SpGAT(data.x.shape[1], hidden, classes, 0)
+elif model_name == "MPNN":
+    model = graph_models.MPNNNodeClassifier(data.x.shape[1], hidden, classes)
+elif model_name == "ChebyNet":
+    gso = graph_utlis.calc_gso(adj, 'sym_norm_lap')
+    gso = graph_utlis.calc_chebynet_gso(gso)
+    gso = graph_utlis.cnv_sparse_mat_to_coo_tensor(gso, 'cpu')
+    model = graph_models.ChebyNet(data.x.shape[1], 64, classes, enable_bias=True, K_order=2, K_layer=2, droprate=0.5, gso=gso)
 
 #model = graph_models.GCN(data.x.shape[1], hidden, classes, 0)
 #model = graph_models.GIN(data.x.shape[1], hidden, classes)
 #model = graph_models.SpGAT(data.x.shape[1], hidden, classes, 0)
 #model = graph_models.MPNNNodeClassifier(data.x.shape[1], hidden, classes)
-model = graph_models.ChebyNet(data.x.shape[1], 64, classes, True, 2, 2, 0.5, gso)
+#model = graph_models.ChebyNet(data.x.shape[1], 64, classes, True, 2, 2, 0.5, gso)
 
 num_params = count_parameters(model)
 model.train()
@@ -123,7 +155,7 @@ for run in tqdm(range(runs)):
     best_val = float('-inf')
     for epoch in range(epochs):
         # Training part
-        print(epoch)
+        #print(epoch)
         model.train()
         optimizer.zero_grad()
 
@@ -161,7 +193,7 @@ res_root = 'hyperparameter_tunning'
 if not osp.isdir(res_root):
     os.makedirs(res_root)
 
-filename = f'{res_root}/{dname}_noise_{feature_noise}.csv'
+filename = f'{res_root}/{"expansion_experiments"}/{dname}_{model_name}_{expansion_name}.csv'
 print(f"Saving results to {filename}")
 with open(filename, 'a+') as write_obj:
     cur_line = f'{method}_{lr}_{wd}_{heads}'
@@ -172,7 +204,7 @@ with open(filename, 'a+') as write_obj:
     cur_line += f'\n'
     write_obj.write(cur_line)
 
-all_args_file = f'{res_root}/all_args_{dname}_noise_{feature_noise}.csv'
+# all_args_file = f'{res_root}/all_args_{dname}_noise_{feature_noise}.csv'
 # with open(all_args_file, 'a+') as f:
 #     f.write(str(args))
 #     f.write('\n')
