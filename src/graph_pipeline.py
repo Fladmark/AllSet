@@ -13,12 +13,13 @@ import numpy as np
 import os.path as osp
 import os
 import scipy.sparse as sp
+import graph_utlis
 
 #dname = "Mushroom"
 #dname = "house-committees-100"
 #dname = "cora"
-#dname = "zoo"
-dname = "citeseer"
+dname = "zoo"
+#dname = "citeseer"
 
 dataset = get_data(dname)
 
@@ -42,14 +43,13 @@ pairs = (dataset.data.edge_index.numpy().T)
 
 # Choose expansion
 #adj, Pv, PvT, Pe, PeT = line_expansion(pairs, dataset.data.y, 30, 30)
-#adj, Pv, PvT = line_expansion_2(pairs, dataset.data.y, 30, 30)
+adj, Pv, PvT = line_expansion_2(pairs, dataset.data.y, 30, 30)
 #adj, Pv, PvT = clique_expansion(pairs, dataset.data.y)
 #adj, Pv, PvT = line_graph(pairs, dataset.data.y)
 #adj, Pv, PvT = star_expansion(pairs, dataset.data.y, method=1)
 #adj, Pv, PvT = star_expansion(pairs, dataset.data.y, method=2)
-adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=1)
+#adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=1)
 #adj, Pv, PvT = lawler_expansion(pairs, dataset.data.y, method=2)
-print("number of nodes: " + str(len(dataset.data.y)))
 
 # project features to LE
 dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
@@ -58,12 +58,12 @@ dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
 PvT = sparse_mx_to_torch_sparse_tensor(PvT)
 
 
-runs = 1
+runs = 3
 train_prop = 0.50
 valid_prop = 0.25
 lr = 0.02
 wd = 5e-3
-epochs = 50
+epochs = 500
 hidden = 64
 
 if dname == "cora":
@@ -98,13 +98,15 @@ for run in range(runs):
         data.y, train_prop=train_prop, valid_prop=valid_prop)
     split_idx_lst.append(split_idx)
 
-# Choose GNN
+gso = graph_utlis.calc_gso(adj, 'sym_norm_lap')
+gso = graph_utlis.calc_chebynet_gso(gso)
+gso = graph_utlis.cnv_sparse_mat_to_coo_tensor(gso, 'cpu')
+
 #model = graph_models.GCN(data.x.shape[1], hidden, classes, 0)
-#model = graph_models.GIN(data.x.shape[1], hidden, classes) # does not work
+#model = graph_models.GIN(data.x.shape[1], hidden, classes)
 #model = graph_models.SpGAT(data.x.shape[1], hidden, classes, 0)
-#model = graph_models.GAT(data.x.shape[1], hidden, classes, 0)
-#model = graph_models.GINq(data.x.shape[1], hidden, classes) # does not work
-model = graph_models.MPNNNodeClassifier(data.x.shape[1], hidden, classes)
+#model = graph_models.MPNNNodeClassifier(data.x.shape[1], hidden, classes)
+model = graph_models.ChebyNet(data.x.shape[1], 64, classes, True, 2, 2, 0.5, gso)
 
 num_params = count_parameters(model)
 model.train()
@@ -127,8 +129,6 @@ for run in tqdm(range(runs)):
 
         out = model(data.x, adj, PvT)
         #out = model(data.x, data.edge_index, PvT)
-        #train_idx = torch.tensor(train_idx).long()
-        #print(train_idx)
         loss = criterion(out[train_idx], data.y[train_idx])
 
         loss.backward()

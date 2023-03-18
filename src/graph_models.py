@@ -14,7 +14,12 @@ from torch_geometric.nn import global_mean_pool, global_add_pool
 from torch_scatter import scatter_sum
 from torch_geometric.utils import add_self_loops, degree
 import scipy.sparse as sp
-
+import math
+import torch
+import torch.nn as nn
+import torch.nn.init as init
+import torch.nn.functional as F
+from torch import Tensor
 class GCN(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout):
         super(GCN, self).__init__()
@@ -356,3 +361,115 @@ class MPNNNodeClassifier(nn.Module):
         self.fc = nn.Linear(self.hidden_dim, self.num_classes)
         #for layer in self.layers:
         #    layer.reset_parameters()
+
+
+
+####
+
+
+class ChebGraphConv(nn.Module):
+    def __init__(self, K, in_features, out_features, bias):
+        super(ChebGraphConv, self).__init__()
+        self.K = K
+        self.weight = nn.Parameter(torch.FloatTensor(K, in_features, out_features))
+        if bias:
+            self.bias = nn.Parameter(torch.FloatTensor(out_features))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+            init.uniform_(self.bias, -bound, bound)
+
+    def forward(self, x, gso):
+        # Chebyshev polynomials:
+        # x_0 = x,
+        # x_1 = gso * x,
+        # x_k = 2 * gso * x_{k-1} - x_{k-2},
+        # where gso = 2 * gso / eigv_max - id.
+
+        cheb_poly_feat = []
+        if self.K < 0:
+            raise ValueError('ERROR: The order of Chebyshev polynomials shoule be non-negative!')
+        elif self.K == 0:
+            # x_0 = x
+            cheb_poly_feat.append(x)
+        elif self.K == 1:
+            # x_0 = x
+            cheb_poly_feat.append(x)
+            if gso.is_sparse:
+                # x_1 = gso * x
+                cheb_poly_feat.append(torch.sparse.mm(gso, x))
+            else:
+                if x.is_sparse:
+                    x = x.to_dense
+                # x_1 = gso * x
+                cheb_poly_feat.append(torch.mm(gso, x))
+        else:
+            # x_0 = x
+            cheb_poly_feat.append(x)
+            if gso.is_sparse:
+                # x_1 = gso * x
+                cheb_poly_feat.append(torch.sparse.mm(gso, x))
+                # x_k = 2 * gso * x_{k-1} - x_{k-2}
+                for k in range(2, self.K):
+                    cheb_poly_feat.append(torch.sparse.mm(2 * gso, cheb_poly_feat[k - 1]) - cheb_poly_feat[k - 2])
+            else:
+                if x.is_sparse:
+                    x = x.to_dense
+                # x_1 = gso * x
+                cheb_poly_feat.append(torch.mm(gso, x))
+                # x_k = 2 * gso * x_{k-1} - x_{k-2}
+                for k in range(2, self.K):
+                    cheb_poly_feat.append(torch.mm(2 * gso, cheb_poly_feat[k - 1]) - cheb_poly_feat[k - 2])
+
+        feature = torch.stack(cheb_poly_feat, dim=0)
+        if feature.is_sparse:
+            feature = feature.to_dense()
+        cheb_graph_conv = torch.einsum('bij,bjk->ik', feature, self.weight)
+
+        if self.bias is not None:
+            cheb_graph_conv = torch.add(input=cheb_graph_conv, other=self.bias, alpha=1)
+        else:
+            cheb_graph_conv = cheb_graph_conv
+
+        return cheb_graph_conv
+
+    def extra_repr(self) -> str:
+        return 'K={}, in_features={}, out_features={}, bias={}'.format(
+            self.K, self.in_features, self.out_features, self.bias is not None
+        )
+
+
+class ChebyNet(nn.Module):
+    def __init__(self, n_feat, n_hid, n_class, enable_bias, K_order, K_layer, droprate, gso):
+        super(ChebyNet, self).__init__()
+        self.cheb_graph_convs = nn.ModuleList()
+        self.K_order = K_order
+        self.K_layer = K_layer
+        self.cheb_graph_convs.append(ChebGraphConv(K_order, n_feat, n_hid, enable_bias))
+        for k in range(1, K_layer-1):
+            self.cheb_graph_convs.append(ChebGraphConv(K_order, n_hid, n_hid, enable_bias))
+        self.cheb_graph_convs.append(ChebGraphConv(K_order, n_hid, n_class, enable_bias))
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(p=droprate)
+        self.log_softmax = nn.LogSoftmax(dim=1)
+        self.gso = gso
+
+    def forward(self, x, adj, PvT):
+        for k in range(self.K_layer-1):
+            x = self.cheb_graph_convs[k](x, self.gso)
+            x = self.relu(x)
+            x = self.dropout(x)
+        x = self.cheb_graph_convs[-1](x, self.gso)
+        x = self.log_softmax(x)
+
+        return x
+
+    def reset_parameters(self):
+        for layer in self.cheb_graph_convs:
+            layer.reset_parameters()

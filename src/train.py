@@ -473,7 +473,7 @@ if __name__ == '__main__':
     #         scheduler = torch.optim.lr_scheduler.StepLR(optimizer,step_size=100, gamma=0.51)
         best_val = float('-inf')
         for epoch in range(args.epochs):
-            print(epoch)
+            #print(epoch)
             #         Training part
             model.train()
             optimizer.zero_grad()
