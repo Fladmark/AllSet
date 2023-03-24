@@ -177,7 +177,7 @@ class PMA(MessagePassing):
         return x_j * alpha.unsqueeze(-1)
 
     def aggregate(self, inputs, index,
-                  dim_size=None, aggr=None):
+                  dim_size=None, aggr="add"):
         r"""Aggregates messages from neighbors as
         :math:`\square_{j \in \mathcal{N}(i)}`.
 

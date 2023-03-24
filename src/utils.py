@@ -109,8 +109,15 @@ def Laplacian(V, E, X, m):
         s, i = np.argmax(p), np.argmin(p)
         Se, Ie = hyperedge[s], hyperedge[i]
 
+        print(len(hyperedge))
+
         # two stars with mediators
-        c = 2*len(hyperedge) #- 3    # normalisation constant
+
+        c = 2*len(hyperedge) - 3    # normalisation constant
+
+        if len(hyperedge) == 1:
+            continue
+
         if m:
             
             # connect the supremum (Se) with the infimum (Ie)

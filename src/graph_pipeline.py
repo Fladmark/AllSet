@@ -18,6 +18,12 @@ import sys
 
 dname, model_name, expansion_name = sys.argv[1:]
 
+# if os.path.exists(f'{"hyperparameter_tunning"}/{"expansion_experiments"}/{dname}_{model_name}_{expansion_name}.csv'):
+#     print(dname, model_name, expansion_name)
+#     print("Already exists, going next")
+#     quit()
+
+
 print(dname, model_name, expansion_name)
 
 #dname = "Mushroom"
@@ -27,6 +33,8 @@ print(dname, model_name, expansion_name)
 #dname = "citeseer"
 
 dataset = get_data(dname)
+
+print(sum(dataset.data.x))
 
 # Hacky way of halfing the size of edge index (because dataset_Hypergraph for some reason duplicated this)
 single_edge_index = [[],[]]
@@ -80,12 +88,12 @@ dataset.data.x = torch.FloatTensor(np.array(Pv @ dataset.data.x))
 PvT = sparse_mx_to_torch_sparse_tensor(PvT)
 
 
-runs = 1
+runs = 5
 train_prop = 0.50
 valid_prop = 0.25
 lr = 0.001
 wd = 0
-epochs = 500
+epochs = 50
 hidden = 64
 
 if dname == "cora":
@@ -193,7 +201,7 @@ res_root = 'hyperparameter_tunning'
 if not osp.isdir(res_root):
     os.makedirs(res_root)
 
-filename = f'{res_root}/{"expansion_experiments"}/{dname}_{model_name}_{expansion_name}.csv'
+filename = f'{"hyperparameter_tunning"}/{"expansion_experiments"}/{dname}_{model_name}_{expansion_name}.csv'
 print(f"Saving results to {filename}")
 with open(filename, 'a+') as write_obj:
     cur_line = f'{method}_{lr}_{wd}_{heads}'
